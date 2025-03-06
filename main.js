@@ -109,7 +109,6 @@ const notify = async (contents) => {
 };
 
 const main = async () => {
-  process.env.TZ = 'Asia/Shanghai'; // 统一时区
 
   // 动态获取所有账户 (支持 GLADOS_1, GLADOS_2 格式)
   const accounts = Object.entries(process.env)

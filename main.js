@@ -1,8 +1,8 @@
-import dotenv from 'dotenv';
-import crypto from 'crypto';
-import fetch from 'node-fetch';
+// import dotenv from 'dotenv';
+// import crypto from 'crypto';
+// import fetch from 'node-fetch';
 
-dotenv.config();
+// dotenv.config();
 
 // // 添加调试日志
 // console.log('[启动] 环境变量检测:', {
@@ -34,7 +34,7 @@ const glados = async (cookie) => {
 
     return [
       checkin.code === 0 ? '✅ 签到成功' : '⚠️ 重复签到',
-      `📅 剩余天数: ${Math.floor(status.data.leftDays)} 天`,
+      `📅 剩余天数: ${Number(status.data.leftDays)} 天`,
       `🆔 账户标识: ${cookie.match(/koa:sess=([^;]+)/)?.[1].slice(0, 8)}...`
     ];
   } catch (error) {
@@ -119,4 +119,6 @@ const main = async () => {
   console.log('🎉 任务执行完成');
 };
 
-main();
+main()
+  .then(() => console.log('✅ 所有流程完成'))
+  .catch(err => console.error('‼️ 全局错误:', err));

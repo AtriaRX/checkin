@@ -46,21 +46,51 @@ const main = async () => {
   await notify(results.flat())
 }
 
-// 修改后的通用通知函数
-const notify = async (contents) => {
-  const tokens = [process.env.NOTIFY, process.env.NOTIFY2].filter(Boolean)
-  if (!tokens.length || !contents) return
+// 新增：钉钉签名生成函数
+const generateDingSign = (secret) => {
+  const timestamp = Date.now();
+  const stringToSign = `${timestamp}\n${secret}`;
+  const crypto = require('crypto');
+  const sign = crypto.createHmac('sha256', secret).update(stringToSign).digest('base64');
+  return { timestamp, sign };
+};
 
-  await Promise.all(tokens.map(token => 
-    fetch(`https://www.pushplus.plus/send`, {
+// 修改后的通知函数
+const notify = async (contents) => {
+  const webhook = process.env.DINGTALK_WEBHOOK;
+  const secret = process.env.DINGTALK_SECRET;
+
+  if (!webhook || !contents) return;
+
+  try {
+    // 生成签名参数
+    const { timestamp, sign } = generateDingSign(secret);
+    const url = `${webhook}&timestamp=${timestamp}&sign=${encodeURIComponent(sign)}`;
+
+    // 构造钉钉消息体
+    const message = {
+      msgtype: "markdown",
+      markdown: {
+        title: "签到结果通知",
+        text: `### GitHub签到结果\n${contents.join('\n\n')}`
+      },
+      at: {
+        isAtAll: false  // 如需@特定人，设置atMobiles: ["手机号"]
+      }
+    };
+
+    // 发送请求
+    const response = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        title: 'GLaDOS Checkin Report',
-        content: contents.join('<br>'),
-        template: 'markdown',
-      }),
-    })
-  ))
-}
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message)
+    });
+  
+    const result = await response.json();
+    if (result.errcode !== 0) {
+      console.error('钉钉通知失败:', result.errmsg);
+    }
+  } catch (error) {
+    console.error('通知异常:', error);
+  }
+};

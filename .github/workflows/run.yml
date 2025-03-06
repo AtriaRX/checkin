@@ -25,8 +25,8 @@ jobs:
 
       - name: Run checkin
         env:
-          GLADOS_1: ${{ secrets.GLADOS_1 }} # 账户1
-          GLADOS_2: ${{ secrets.GLADOS_2 }} # 账户2
+          GLADOS_1: ${{ secrets.GLADOS }} # 账户1
+          GLADOS_2: ${{ secrets.GLADOS2 }} # 账户2
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: node main.js

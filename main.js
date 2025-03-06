@@ -59,48 +59,53 @@ const generateDingSign = (secret) => {
 
 // 修改后的通知函数
 const notify = async (contents) => {
-  console.log('当前环境变量:', {
-    DINGTALK_WEBHOOK: !!process.env.DINGTALK_WEBHOOK,
-    DINGTALK_SECRET: !!process.env.DINGTALK_SECRET
-  })
-
-  // 在发送请求前打印
-  console.log('钉钉请求URL:', url)
-  console.log('请求Payload:', message)
   const webhook = process.env.DINGTALK_WEBHOOK;
   const secret = process.env.DINGTALK_SECRET;
 
-  if (!webhook || !contents) return;
+  if (!webhook || !contents) {
+    console.log('缺少必要参数，跳过通知');
+    return;
+  }
 
   try {
-    // 生成签名参数
     const { timestamp, sign } = generateDingSign(secret);
     const url = `${webhook}&timestamp=${timestamp}&sign=${encodeURIComponent(sign)}`;
 
-    // 构造钉钉消息体
+    // 构造增强版通知内容
+    const formattedContents = contents.map((text, index) => 
+      `**账户${index + 1}**\n${text.replace(/\n/g, '\n\n')}`
+    ).join('\n\n--------------------------------\n\n');
+
     const message = {
       msgtype: "markdown",
       markdown: {
-        title: "签到结果通知",
-        text: `### GitHub签到结果\n${contents.join('\n\n')}`
-      },
-      at: {
-        isAtAll: false  // 如需@特定人，设置atMobiles: ["手机号"]
+        title: "🎉 GLaDOS 签到报告",
+        text: `### ⏰ 任务执行时间 ${new Date().toLocaleString()}\n\n${formattedContents}`
       }
     };
 
-    // 发送请求
+    // 调试日志
+    console.log('最终请求URL:', url);
+    console.log('消息体:', JSON.stringify(message, null, 2));
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(message)
     });
-  
+
+    if (!response.ok) {
+      throw new Error(`HTTP 错误: ${response.status}`);
+    }
+
     const result = await response.json();
     if (result.errcode !== 0) {
-      console.error('钉钉通知失败:', result.errmsg);
+      console.error('钉钉 API 返回错误:', result);
     }
   } catch (error) {
-    console.error('通知异常:', error);
+    console.error('❌ 通知发送失败:', error.message);
+    if (error.response) {
+      console.error('响应详情:', await error.response.text());
+    }
   }
 };

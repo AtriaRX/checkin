@@ -2,54 +2,56 @@ import crypto from 'crypto';
 import fetch from 'node-fetch';
 
 const glados = async (cookie) => {
+  if (!cookie?.includes('koa:sess=')) {
+    return ['❌ Cookie格式错误', '缺少必要字段 koa:sess'];
+  }
+
   try {
     const headers = {
       cookie,
       referer: 'https://glados.rocks/console/checkin',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
     };
 
+    // 并行请求优化
     const [checkin, status] = await Promise.all([
       fetch('https://glados.rocks/api/user/checkin', {
         method: 'POST',
-        headers: {
-          ...headers,
-          'content-type': 'application/json'
-        },
+        headers: { ...headers, 'content-type': 'application/json' },
         body: JSON.stringify({ token: "glados.one" }),
       }).then(async r => {
-        if (!r.ok) {
-          const errorBody = await r.text();
-          throw new Error(`Checkin API ${r.status}: ${errorBody}`);
-        }
+        if (!r.ok) throw new Error(`签到失败: ${r.status}`);
         return r.json();
       }),
 
       fetch('https://glados.rocks/api/user/status', {
         method: 'GET',
-        headers,
+        headers
       }).then(async r => {
-        if (!r.ok) {
-          const errorBody = await r.text();
-          throw new Error(`Status API ${r.status}: ${errorBody}`);
-        }
+        if (!r.ok) throw new Error(`状态获取失败: ${r.status}`);
         return r.json();
       })
     ]);
 
+    // 数据有效性校验
+    if (!status?.data?.leftDays) {
+      throw new Error('返回数据格式异常');
+    }
+
     return [
       checkin.code === 0 ? '✅ 签到成功' : '⚠️ 重复签到',
       `📅 剩余天数: ${Number(status.data.leftDays).toFixed(1)} 天`,
-      `🆔 账户标识: ${cookie.match(/koa:sess=([^;]+)/)?.[1].slice(0, 8)}...`
+      `🆔 账户标识: ${cookie.match(/koa:sess=([^;]+)/)[1].slice(0, 8)}...`
     ];
   } catch (error) {
     return [
-      '❌ 签到失败',
-      `错误信息: ${error.message.replace(/\n/g, ' ')}`, // 防止换行破坏格式
-      `🆔 账户标识: ${cookie?.slice(0, 15) || '未知账户'}...`
+      '❌ 执行错误',
+      `${error.message}`,
+      `🆔 账户标识: ${cookie.slice(0, 15)}...`,
+      `🔗 日志链接: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
     ];
   }
-};
+}
 
 const generateDingSign = (secret) => {
   const timestamp = Date.now();

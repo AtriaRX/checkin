@@ -21,3 +21,5 @@ jobs:
           GLADOS2: ${{ secrets.GLADOS2 }}
           NOTIFY: ${{ secrets.NOTIFY }}
           NOTIFY2: ${{ secrets.NOTIFY2 }}
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}

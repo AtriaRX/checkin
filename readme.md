@@ -17,4 +17,4 @@ GitHub Actions 实现 [GLaDOS][glados] 自动签到
 1. 如需推送通知, 可用[钉钉机器人][dingtalk-robots], 添加 Token 到 Secret `DINGTALK_SECRET`、`DINGTALK_WEBHOOK`
 
 [glados]: https://github.com/glados-network/GLaDOS
-[dingtalk-robots]: [钉钉机器人](https://open.dingtalk.com/document/robots/customize-robot-security-settings)
+[dingtalk-robots]: https://open.dingtalk.com/document/robots/customize-robot-security-settings

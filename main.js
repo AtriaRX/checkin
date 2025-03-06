@@ -41,9 +41,11 @@ const main = async () => {
     glados(process.env.GLADOS, process.env.NOTIFY),
     glados(process.env.GLADOS2, process.env.NOTIFY2)
   ])
+  console.log('通知内容:', results) // 确认有有效数据
 
   // 发送合并通知（如需分开通知可单独调用notify）
   await notify(results.flat())
+  console.log('通知函数已执行')
 }
 
 // 新增：钉钉签名生成函数
@@ -57,6 +59,14 @@ const generateDingSign = (secret) => {
 
 // 修改后的通知函数
 const notify = async (contents) => {
+  console.log('当前环境变量:', {
+    DINGTALK_WEBHOOK: !!process.env.DINGTALK_WEBHOOK,
+    DINGTALK_SECRET: !!process.env.DINGTALK_SECRET
+  })
+
+  // 在发送请求前打印
+  console.log('钉钉请求URL:', url)
+  console.log('请求Payload:', message)
   const webhook = process.env.DINGTALK_WEBHOOK;
   const secret = process.env.DINGTALK_SECRET;
 

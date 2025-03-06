@@ -1,37 +1,32 @@
-name: Checkin Bot
+name: GLaDOS Checkin
 
 on:
-  workflow_dispatch:
-  push:
   schedule:
-    - cron: "10 16 * * *"
+    - cron: '0 8 * * *' # 每天 UTC 0 点 (北京时间 8 点)
+  workflow_dispatch:
 
 jobs:
-  run:
+  checkin:
     runs-on: ubuntu-latest
-    env:  # ✅ 全局环境变量
-      GLADOS: ${{ secrets.GLADOS }}
-      GLADOS2: ${{ secrets.GLADOS2 }}
-      DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
-      DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
-      NOTIFY: ${{ secrets.NOTIFY }}
-      NOTIFY2: ${{ secrets.NOTIFY2 }}
-
+    timeout-minutes: 5
+  
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 18
-          cache: "npm"
+          node-version: 20.x
+          cache: 'npm'
 
-      - name: Install Dependencies
-        run: |
-          npm ci --loglevel verbose  # ✅ 启用详细日志
-          echo "NODE_PATH=$(npm root -g)" >> $GITHUB_ENV
+      - name: Install dependencies
+        run: npm install node-fetch@3.x
 
-      - name: Run Checkin
-        run: npm run main
+      - name: Run checkin
         env:
-          # 覆盖调试级别（可选）
-          NODE_DEBUG: "fetch,http"
+          GLADOS_1: ${{ secrets.GLADOS_1 }} # 账户1
+          GLADOS_2: ${{ secrets.GLADOS_2 }} # 账户2
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+        run: node main.js

@@ -1,15 +1,5 @@
-// import dotenv from 'dotenv';
-// import crypto from 'crypto';
-// import fetch from 'node-fetch';
-
-// dotenv.config();
-
-// // 添加调试日志
-// console.log('[启动] 环境变量检测:', {
-//   GLADOS: !!process.env.GLADOS,
-//   DINGTALK_WEBHOOK: !!process.env.DINGTALK_WEBHOOK,
-//   DINGTALK_SECRET: !!process.env.DINGTALK_SECRET
-// });
+import crypto from 'crypto';
+import fetch from 'node-fetch';
 
 const glados = async (cookie) => {
   try {
@@ -22,26 +12,41 @@ const glados = async (cookie) => {
     const [checkin, status] = await Promise.all([
       fetch('https://glados.rocks/api/user/checkin', {
         method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json' },
+        headers: {
+          ...headers,
+          'content-type': 'application/json'
+        },
         body: JSON.stringify({ token: "glados.one" }),
-      }).then(r => r.json()),
+      }).then(async r => {
+        if (!r.ok) {
+          const errorBody = await r.text();
+          throw new Error(`Checkin API ${r.status}: ${errorBody}`);
+        }
+        return r.json();
+      }),
 
       fetch('https://glados.rocks/api/user/status', {
         method: 'GET',
         headers,
-      }).then(r => r.json())
+      }).then(async r => {
+        if (!r.ok) {
+          const errorBody = await r.text();
+          throw new Error(`Status API ${r.status}: ${errorBody}`);
+        }
+        return r.json();
+      })
     ]);
 
     return [
       checkin.code === 0 ? '✅ 签到成功' : '⚠️ 重复签到',
-      `📅 剩余天数: ${Number(status.data.leftDays)} 天`,
+      `📅 剩余天数: ${Number(status.data.leftDays).toFixed(1)} 天`,
       `🆔 账户标识: ${cookie.match(/koa:sess=([^;]+)/)?.[1].slice(0, 8)}...`
     ];
   } catch (error) {
     return [
       '❌ 签到失败',
-      `错误信息: ${error.message}`,
-      `🆔 账户标识: ${cookie.slice(0, 15)}...`
+      `错误信息: ${error.message.replace(/\n/g, ' ')}`, // 防止换行破坏格式
+      `🆔 账户标识: ${cookie?.slice(0, 15) || '未知账户'}...`
     ];
   }
 };
@@ -74,7 +79,7 @@ const notify = async (contents) => {
       markdown: {
         title: "GLaDOS 签到报告",
         text: [
-          `### 自动签到结果 ${new Date().toLocaleString()}`,
+          `### 自动签到结果 ${new Date().toLocaleString('zh-CN')}`,
           ...contents.map((item, index) =>
             `---\n**账户 ${index + 1}**\n${item.join('\n')}`
           )
@@ -85,40 +90,42 @@ const notify = async (contents) => {
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      timeout: 10000, // 增加超时控制
       body: JSON.stringify(message)
     });
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const result = await response.json();
-
     if (result.errcode !== 0) {
-      console.error('钉钉API错误:', result.errmsg);
+      console.error('钉钉API错误:', result);
     }
   } catch (error) {
     console.error('通知异常:', error.message);
+    if (error.response) {
+      console.error('响应详情:', await error.response.text());
+    }
   }
 };
 
 const main = async () => {
-  // console.log('[阶段1] 开始执行');
-  const accounts = [
-    process.env.GLADOS,
-    process.env.GLADOS2
-  ].filter(Boolean);
+  process.env.TZ = 'Asia/Shanghai'; // 统一时区
+
+  // 动态获取所有账户 (支持 GLADOS_1, GLADOS_2 格式)
+  const accounts = Object.entries(process.env)
+    .filter(([key]) => key.startsWith('GLADOS'))
+    .map(([, value]) => value);
 
   if (accounts.length === 0) {
-    console.log('⚠️ 未配置有效账户');
-    return;
+    throw new Error('未配置 GLADOS 开头的账户变量');
   }
 
-  const results = await Promise.all(
-    accounts.map(cookie => glados(cookie))
-  );
-
+  console.log(`🏃 开始处理 ${accounts.length} 个账户`);
+  const results = await Promise.all(accounts.map(glados));
   await notify(results);
-  console.log('🎉 任务执行完成');
 };
 
 main()
   .then(() => console.log('✅ 所有流程完成'))
-  .catch(err => console.error('‼️ 全局错误:', err));
+  .catch(err => {
+    console.error('‼️ 全局错误:', err.message);
+    process.exit(1); // 确保 Action 标记为失败
+  });

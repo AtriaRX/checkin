@@ -3,55 +3,58 @@ import fetch from 'node-fetch';
 
 const glados = async (cookie) => {
   if (!cookie?.includes('koa:sess=')) {
-    return ['❌ Cookie格式错误', '缺少必要字段 koa:sess'];
+    return ['❌ Cookie格式错误', '缺少koa:sess字段'];
   }
 
   try {
     const headers = {
       cookie,
       referer: 'https://glados.rocks/console/checkin',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...'
     };
 
-    // 并行请求优化
-    const [checkin, status] = await Promise.all([
-      fetch('https://glados.rocks/api/user/checkin', {
-        method: 'POST',
-        headers: { ...headers, 'content-type': 'application/json' },
-        body: JSON.stringify({ token: "glados.one" }),
-      }).then(async r => {
-        if (!r.ok) throw new Error(`签到失败: ${r.status}`);
-        return r.json();
-      }),
+    // 顺序执行关键请求
+    const checkinRes = await fetch('https://glados.rocks/api/user/checkin', {
+      method: 'POST',
+      headers: { ...headers, 'content-type': 'application/json' },
+      body: JSON.stringify({ token: "glados.one" }),
+    });
+    const checkinData = await checkinRes.json();
+  
+    // 添加请求间隔
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const statusRes = await fetch('https://glados.rocks/api/user/status', {
+      method: 'GET',
+      headers
+    });
+    const status = await statusRes.json();
 
-      fetch('https://glados.rocks/api/user/status', {
-        method: 'GET',
-        headers
-      }).then(async r => {
-        if (!r.ok) throw new Error(`状态获取失败: ${r.status}`);
-        return r.json();
-      })
-    ]);
-
-    // 数据有效性校验
-    if (!status?.data?.leftDays) {
-      throw new Error('返回数据格式异常');
+    // 深度数据校验
+    if (!status?.data || typeof status.data.leftDays === 'undefined') {
+      console.error('异常数据:', JSON.stringify(status, null, 2));
+      throw new Error('API返回结构异常，建议检查Cookie有效性');
     }
 
     return [
-      checkin.code === 0 ? '✅ 签到成功' : '⚠️ 重复签到',
-      `📅 剩余天数: ${Number(status.data.leftDays).toFixed(1)} 天`,
-      `🆔 账户标识: ${cookie.match(/koa:sess=([^;]+)/)[1].slice(0, 8)}...`
+      checkinData.code === 0 ? '✅ 签到成功' : '🔄 重复签到',
+      `📆 剩余天数: ${Number(status.data.leftDays).toFixed(1)}天`,
+      `🔐 账户ID: ${cookie.match(/koa:sess=([^;]+)/)[1].slice(0, 8)}***`
     ];
+  
   } catch (error) {
+    console.error('完整错误日志:', {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     return [
-      '❌ 执行错误',
-      `${error.message}`,
-      `🆔 账户标识: ${cookie.slice(0, 15)}...`,
-      `🔗 日志链接: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+      '❌ 执行失败',
+      `错误类型: ${error.name}`,
+      `详情: ${error.message}`,
+      `🆔 账户标识: ${cookie.slice(0, 15)}***`
     ];
   }
-}
+};
 
 const generateDingSign = (secret) => {
   const timestamp = Date.now();
